@@ -1,0 +1,170 @@
+const int dirPin = 2;           // Stepper motor direction, connected to DIR pin
+const int clockPin = 3;         // Stepper motor rotation, connected to CLOCK pin
+const int onoffPin = 5;         // Turn Stepper ON or OFF, connected to ON/OFF pin
+const int inductionSensorPin1 = A0; // Inductive Sensor1 Input, switches ON/OFF depending on position of metal bead
+//const int inductionSensorPin2 = A1; // Inductive Sensor2 Input, switches ON/OFF depending on position of metal bead
+const int onoffinputPin = 9;    // Turn Stepper ON or OFF, switched by user to turn stepper motor ON/OFF
+const int pushbuttonPin = 12;    // Changes value of ON/OFF pin
+
+bool overrideOn = false;
+bool motorControlEnabled = false; // Flag to control the motor based on serial input
+bool direction = true; // true for counter clockwise, false for clockwise
+bool gotDetected = false; // detection of metal in inductive sensor
+int timeDelay = 1000;
+int newDelay;
+int stepCount = 0;
+int DistanceMoved = 0; // distance of source from home
+int radius = 0.15; // radius of motor in meters
+
+unsigned long lastSendTime = 0;
+const long sendInterval = 1000; // send data every 1000 milliseconds
+
+void setup()
+{
+  pinMode(dirPin, OUTPUT);
+  pinMode(clockPin, OUTPUT);
+  pinMode(onoffPin, OUTPUT);
+  pinMode(inductionSensorPin1, INPUT_PULLUP);
+  //pinMode(inductionSensorPin2, INPUT_PULLUP);
+  pinMode(onoffinputPin, INPUT);
+  pinMode(pushbuttonPin, INPUT);
+
+  digitalWrite(dirPin, HIGH);
+  digitalWrite(onoffPin, LOW);
+  digitalWrite(pushbuttonPin, LOW);
+
+  Serial.begin(9600); // Start serial communication
+}
+
+void loop()
+{
+  // Check if serial data is available
+  if (Serial.available() > 0) 
+  {
+    String command = Serial.readStringUntil('\n');
+    if (command == "stop") 
+    {
+      motorControlEnabled = false;
+    } else if (command == "start") 
+    {
+      motorControlEnabled = true;
+      stepCount=0;
+    }
+    else if (command == "changedirection")
+    {
+      direction = !direction;
+    }
+    else if (command.startsWith("setDelay"))
+    {
+      int index = command.indexOf(' ');
+      if (index != -1) 
+      {
+        String delayString = command.substring(index + 1);
+        newDelay = delayString.toInt();
+        timeDelay = newDelay;
+      }
+    }
+    else if(command == "overrideOn")
+    {
+      overrideOn = true;
+    }
+  }
+    // Send stepCount every sendInterval milliseconds
+    if (millis() - lastSendTime > sendInterval)
+    {
+      lastSendTime = millis();
+    }
+  
+  int sensorValue1 =  analogRead(inductionSensorPin1);
+  float voltage1 = sensorValue1 * (12.0/1023.0);
+
+  //int sensorValue2 =  analogRead(inductionSensorPin2);
+  //float voltage2 = sensorValue2 * (12.0/1023.0);
+  
+  if(overrideOn == false)
+  {
+    //if(digitalRead(inductionSensorPin1) <= 10 && digitalRead(inductionSensorPin2) <= 10 && gotDetected == false)
+    if(digitalRead(inductionSensorPin1) <= 10 && gotDetected == false) 
+    {
+      // motor logic
+      if (motorControlEnabled && digitalRead(pushbuttonPin) == HIGH)  
+      {  
+        if (direction) 
+        {
+          digitalWrite(onoffPin, HIGH);
+          digitalWrite(dirPin, HIGH);
+          rotateMotor();
+        } 
+        else 
+        {
+          digitalWrite(onoffPin, HIGH);
+          digitalWrite(dirPin, LOW);
+          rotateMotor();
+        }
+      }
+      else 
+      {
+        digitalWrite(onoffPin, LOW); // Stop the motor
+      }
+    }
+
+    //if(voltage1 > 10 || voltage2 > 10)
+    if(voltage1 > 10)
+    { //condition when metal detected
+      ChangeDirection();
+      for(int i=0;i<1600;i++)
+        {
+          rotateMotor();
+        }
+
+      gotDetected = true;
+      ChangeDirection();
+      digitalWrite(onoffPin, LOW);
+    }
+    
+  }
+  if(overrideOn == true)
+  {
+      gotDetected = false;
+      digitalWrite(onoffPin, LOW);
+      overrideOn = false;  //  to reset the override so it doesn't continuosly loop through
+      motorControlEnabled = false;
+  }   
+}
+
+void rotateMotor() 
+{
+  // Rotate the motor by one step
+  digitalWrite(clockPin, HIGH); //set the step pin to high to move the motor
+  delayMicroseconds(timeDelay); // Adjust the speed by changing the delay time
+  digitalWrite(clockPin, LOW);
+  delayMicroseconds(timeDelay);
+
+  stepCount++;
+
+  distanceUpdate();
+}
+
+void distanceUpdate() 
+{
+  if (direction) {
+    DistanceMoved = DistanceMoved + (2*PI/1600)*radius*stepCount;
+  }
+}
+
+bool GetDirection()
+{
+  return direction;
+}
+
+void ChangeDirection()
+{
+  if(GetDirection())
+      {
+        digitalWrite(dirPin, LOW);
+      }
+      else
+      {
+        digitalWrite(dirPin, HIGH);
+      }
+}
