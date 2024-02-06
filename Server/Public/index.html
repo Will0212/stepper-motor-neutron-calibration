@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CUTE: Neutron Calibration System</title> 
+
+    <style> /* All General Style for the Webapp */
+
+      body {
+
+    font-family: Arial, sans-serif;
+
+    background-color: #f0f0f0;
+
+    text-align: center;
+
+    margin: 0;
+
+    padding: 0;
+
+      }
+ 
+      h1 {
+
+    color: #007bff;
+
+    font-size: 36px;
+
+    margin-top: 10px; 
+
+    margin-bottom: 10px; 
+
+      }
+ 
+      button {
+
+    background-color: blue;
+
+    color: #fff;
+
+    font-size: 24px;
+
+    padding: 10px 20px;
+
+    margin: 5px; 
+
+    border: none;
+
+    cursor: pointer;
+
+    border-radius: 5px;
+
+      }
+ 
+      button:hover {
+
+    background-color: #0056b3;
+
+      }
+ 
+      label {
+
+    font-size: 20px;
+
+    color: #333;
+
+      }
+ 
+      input[type="number"] {
+
+    font-size: 20px;
+
+    padding: 5px;
+
+    width: 150px;
+
+      }
+ 
+      #submitDelay {
+
+    font-size: 24px;
+
+    background-color: #007bff;
+
+    color: #fff;
+
+    padding: 10px 20px;
+
+    border: none;
+
+    cursor: pointer;
+
+    border-radius: 5px;
+
+      }
+ 
+      #submitDelay:hover {
+
+    background-color: #0056b3;
+
+      }
+ 
+      p {
+
+    font-size: 18px; 
+
+    margin-top: 10px; 
+
+    margin-bottom: 10px; 
+
+      }
+ 
+      span {
+
+    font-weight: bold;
+
+      }
+ 
+    </style>
+
+</head>
+
+<body>
+
+    <!-- Creating all the buttons and text on the Webapp -->
+
+    <h1>CUTE: Neutron Calibration System</h1>
+
+    <button onclick="controlMotor('start')">Start Motor</button>
+
+    <button onclick="controlMotor('stop')">Stop Motor</button>
+
+    <button onclick="controlMotor('changedirection')">Change Direction</button>
+
+    <br>
+
+    <button onclick="controlMotor('goToHousing')">Send Source to Housing</button>
+
+    <button onclick="controlMotor('goToDetector')">Send Source to Detector</button>
+
+    <br>
+
+    <label for="delay">Delay in microseconds (100-10000):</label>
+
+    <input type="number" id="delayInput" name="delay" min="100" max="10000" />
+
+    <button id="submitDelay" onclick="submitDelayValue()">Submit</button>
+
+    <br>
+
+    <p style = "margin-bottom: 1cm;">100 = FAST, 10000 = SLOW</p>
+
+    <p>Source Position: <span id="currentSourcePosition">0</span> meters</p>
+
+    <p style = "margin-bottom:1cm;">Current Direction: <span id="currentDirection">CounterClockWise</span></p>
+
+    <button id="overrideButton" style="background-color: blue;" onclick= "controlMotor('overrideOn')">Override Mode</button>
+
+    <p style = "font-size: 40px;">Override Mode is <span id="currentOverrideStatus">OFF</span></p>
+
+    <script>
+
+
+        // Function to store the delay value inputed into the Webapp
+        function submitDelayValue()
+        {
+          var delayValue = document.getElementById('delayInput').value;
+
+          controlMotor('setDelay', delayValue);
+        }
+ 
+
+        // Function to process the commands inputted on the Webapp and send them to server.js
+        function controlMotor(command, value)
+         {
+            let url = `/control_motor?command=${command}`;
+
+            if (value !== undefined) {
+
+                url += `&value=${value}`;
+
+            }
+ 
+            fetch(url)
+
+            .then(response => response.text())
+
+            .then(data => console.log(data));
+        }
+
+
+        // Function to update the current override status of the motor on the Webapp as per the value stored in server.js
+        function updateOverrideStatus() 
+        {
+            fetch('/get_override_status')
+
+            .then(response => response.json())
+
+            .then(data => {
+                document.getElementById('currentOverrideStatus').innerText = data.overrideOn;
+           })
+           .catch(error => console.error('Error fetching override status:', error));
+        }
+
+
+        // Function to update the current delay value of the motor on the Webapp as per the value stored in server.js
+        function updateDelayInput()
+        {
+          fetch('/get_delay_value')
+
+          .then(response => response.json())
+
+          .then(data => {
+            document.getElementById('currentDelayValue').innerText = data.delayValue;
+          })
+          .catch(error => console.error('Error fetching override status:', error));
+        }
+ 
+
+        // Function to update the direction status of the motor on the Webapp as per the value stored in server.js
+        function updateDirectionStatus()
+         {
+            fetch('/get_direction_status')
+
+            .then(response => response.json())
+
+            .then(data => {
+                document.getElementById('currentDirection').innerText = data.direction;
+           })
+           .catch(error => console.error('Error fetching direction status:', error));
+        }
+
+
+        // Function to update the source postion of the motor on the Webapp as per the value stored in server.js
+        function updateSourcePosition() 
+        {
+            fetch('/get_source_position')
+
+            .then(response => response.json())
+
+            .then(data => {
+                document.getElementById('currentSourcePosition').innerText = data.sourcePosition.toFixed(2);
+            })
+            .catch(error => console.error('Error fetching source position:', error));
+        }
+ 
+         // Update override status every 100 milliseconds
+        setInterval(updateOverrideStatus, 100);
+
+        // Update source postion every 100 milliseconds
+        setInterval(updateSourcePosition, 100);
+ 
+        // Update direction Status every 100 milliseconds
+        setInterval(updateDirectionStatus, 100);
+
+    </script>
+
+</body>
+
+</html>
